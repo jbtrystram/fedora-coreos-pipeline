@@ -19,10 +19,11 @@ streams:
       RUNVM_CACHE_SIZE: "30G"
     osbuild_experimental: true
     additional_registry_repos:
-      - repo: quay.io/jbtrystram/fcos
-        tags: ["rawhide", "test"]
-      - repo: quay.io/jbtrystram/someotherrepo
-        tags: ["sometag"]
+      oscontainer:
+        - repo: quay.io/jbtrystram/fcos
+          tags: ["rawhide", "test"]
+        - repo: quay.io/jbtrystram/someotherrepo
+          tags: ["sometag"]
   # branched:
   #   type: mechanical
   # bodhi-updates:
