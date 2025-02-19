@@ -267,17 +267,39 @@ lock(resource: "release-${params.STREAM}", extra: locks) {
                                           credentialsId: 'oscontainer-push-registry-secret')]) {
                         def repos = registry_repos[configname]
                         def (artifact, metajsonname) = val
+                        // XXX: remove this workaround when registy.ci.org supports multi-arch manifests
+                        // push the manifest to the first repo in the list
+                        def tag_args = repos[0].tags.collect{"--tag=$it"}
+                        def v2s2_arg = repos[0].v2s2 ? "--v2s2" : ""
+                        shwrap("""
+                        export COSA_SUPERMIN_MEMORY=1024 # this really shouldn't require much RAM
+                        cp \${REGISTRY_SECRET} tmp/push-secret-${metajsonname}
+                        cosa supermin-run /usr/lib/coreos-assembler/cmd-push-container-manifest \
+                            --auth=tmp/push-secret-${metajsonname} \
+                            --repo=${repos[0].repo} ${tag_args.join(' ')} \
+                            --artifact=${artifact} --metajsonname=${metajsonname} \
+                            --build=${params.VERSION} ${v2s2_arg}
+                        rm tmp/push-secret-${metajsonname}
+                        """)
+
+                        // for subsequent repos we use copy-container to copy the image
+                        // from that first repo to the others because some registries (registry.ci.openshift.org)
+                        // do not support multi-arch manifests.
+                        // cosa copy-container have the magic to know this and push separate images
+                        // with the arch as a tag suffix instead of a manifest.
+                        def src_repo = repos[0].repo
+                        def src_tag = repos[0].tags[0]
+                        repos.remove(0)
                         for (repo in repos) {
-                            def tag_args = repo.tags.collect{"--tag=$it"}
-                            def v2s2_arg = repo.v2s2 ? "--v2s2" : ""
+                            tag_args = repo.tags.collect{"--tag=$it"}
+                            v2s2_arg = repo.v2s2 ? "--v2s2" : ""
                             shwrap("""
                             export COSA_SUPERMIN_MEMORY=1024 # this really shouldn't require much RAM
                             cp \${REGISTRY_SECRET} tmp/push-secret-${metajsonname}
-                            cosa supermin-run /usr/lib/coreos-assembler/cmd-push-container-manifest \
-                                --auth=tmp/push-secret-${metajsonname} \
-                                --repo=${repo.repo} ${tag_args.join(' ')} \
-                                --artifact=${artifact} --metajsonname=${metajsonname} \
-                                --build=${params.VERSION} ${v2s2_arg}
+                            cosa supermin-run /usr/lib/coreos-assembler/cmd-copy-container \
+                                --authfile=tmp/push-secret-${metajsonname} \
+                                --tag ${src_tag} ${tag_args.join(' ')} ${v2s2_arg} \
+                                ${src_repo} ${repo.repo}
                             rm tmp/push-secret-${metajsonname}
                             """)
                         }
