@@ -145,6 +145,9 @@ lock(resource: "build-node-image") {
                                                                   "--git-containerfile", "extensions/Dockerfile", "--force"] + label_args)
             }
         }
+        stage("Running tests") {
+            echo "first build the QEMU image out of ${registry_staging_repo}:${registry_staging_tag}"
+        }
         stage("Brew Upload") {
             // Use the staging since we already have the disgests
             pipeutils.brew_upload(arches, params.RELEASE, registry_staging_repo, node_image_manifest_digest,
